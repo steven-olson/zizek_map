@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class Book(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str = Field(description="Title of the book")
+    file_path: str = Field(description="File path of the book, ie where its saved")
 
 
 class Chapter(BaseModel):

@@ -11,3 +11,7 @@ class EpubUtils:
         :param epub_path:
         :return:
         """
+
+    @staticmethod
+    def show_available_epubs():
+        """Given some directory path, show all available epub files there"""
