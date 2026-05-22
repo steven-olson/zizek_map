@@ -10,3 +10,11 @@ books/
 
 # Virtual environments
 .venv
+
+# macOS
+.DS_Store
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

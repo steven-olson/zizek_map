@@ -1,6 +1,4 @@
-def main():
-    print("Hello from zizek-map-mvp!")
-
+from src.textual.app import run
 
 if __name__ == "__main__":
-    main()
+    run()
