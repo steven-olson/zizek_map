@@ -55,7 +55,7 @@ class Failed:
     error: str
 
 
-IngestEvent = (
+type IngestEvent = (
     ParsingEpub
     | HashingFile
     | ReingestingExisting

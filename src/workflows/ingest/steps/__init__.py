@@ -1,8 +1,8 @@
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from src.ingest.context import IngestContext
-from src.ingest.events import IngestEvent
+from src.workflows.ingest.context import IngestContext
+from src.workflows.ingest.events import IngestEvent
 
 
 class Step(Protocol):

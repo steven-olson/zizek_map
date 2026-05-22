@@ -1,7 +1,7 @@
 .PHONY: up down build migrate revision run ingest start nuke fmt psql
 
 up:
-	docker compose up -d postgres
+	docker compose up -d postgres adminer dozzle
 
 down:
 	docker compose down
@@ -27,9 +27,10 @@ run:
 ingest:
 	docker compose run --rm app uv run python -m src.entrypoints.cli ingest /app/books/$(path)
 
-# One-shot bootstrap: build the image, start Postgres, apply migrations, and
-# launch the Textual UI. Equivalent to running `make build up migrate run`
-# in sequence. Use this on first checkout or after a `make nuke`.
+# One-shot bootstrap: build the image, start the backing services (postgres +
+# adminer on :8080 + dozzle on :8081), apply migrations, and launch the Textual
+# UI. Equivalent to running `make build up migrate run` in sequence. Use this
+# on first checkout or after a `make nuke`.
 start:
 	$(MAKE) build
 	$(MAKE) up

@@ -6,13 +6,13 @@ from src.deps.llm.caching_client import CachingLlmClient
 from src.deps.llm.client import LlmClient
 from src.deps.postgres.database import Database
 from src.deps.postgres.repositories import BookComponentRepository, LlmCacheRepository
-from src.ingest.pipeline import IngestPipeline
-from src.ingest.steps import Step
-from src.ingest.steps.check_idempotency import CheckIdempotencyStep
-from src.ingest.steps.classify_spine import ClassifySpineStep
-from src.ingest.steps.parse_epub import ParseEpubStep
-from src.ingest.steps.persist import PersistStep
-from src.ingest.steps.resolve_sections import ResolveSectionsStep
+from src.workflows.ingest.pipeline import IngestPipeline
+from src.workflows.ingest.steps import Step
+from src.workflows.ingest.steps.check_idempotency import CheckIdempotencyStep
+from src.workflows.ingest.steps.classify_spine import ClassifySpineStep
+from src.workflows.ingest.steps.parse_epub import ParseEpubStep
+from src.workflows.ingest.steps.persist import PersistStep
+from src.workflows.ingest.steps.resolve_sections import ResolveSectionsStep
 from src.observability import configure_observability
 from src.settings import Settings, get_settings
 

@@ -1,5 +1,5 @@
-from src.ingest.context import IngestContext
-from src.ingest.events import (
+from src.workflows.ingest.context import IngestContext
+from src.workflows.ingest.events import (
     ChapterCompleted,
     ChapterStarted,
     ClassifyingSpine,
@@ -12,7 +12,7 @@ from src.ingest.events import (
     ReingestingExisting,
     SkippedAlreadyIngested,
 )
-from src.ingest.pipeline import IngestPipeline
+from src.workflows.ingest.pipeline import IngestPipeline
 
 __all__ = [
     "ChapterCompleted",

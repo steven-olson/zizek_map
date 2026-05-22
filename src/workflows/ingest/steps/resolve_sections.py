@@ -5,9 +5,9 @@ from collections.abc import AsyncIterator
 from src.deps.concurrency import BoundedConcurrentRunner
 from src.deps.llm.client import LlmCaller
 from src.deps.postgres.tables import Chapter, Section
-from src.ingest.context import IngestContext
-from src.ingest.events import ChapterCompleted, ChapterStarted, IngestEvent
-from src.ingest.sections import (
+from src.workflows.ingest.context import IngestContext
+from src.workflows.ingest.events import ChapterCompleted, ChapterStarted, IngestEvent
+from src.workflows.ingest.sections import (
     HeadingBasedStrategy,
     LlmFallbackStrategy,
     SectionResolver,

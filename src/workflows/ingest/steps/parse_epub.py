@@ -4,8 +4,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from src.deps.epub_ingest import EpubIngestReader
-from src.ingest.context import IngestContext
-from src.ingest.events import HashingFile, IngestEvent, ParsingEpub
+from src.workflows.ingest.context import IngestContext
+from src.workflows.ingest.events import HashingFile, IngestEvent, ParsingEpub
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,9 @@
 from collections.abc import AsyncIterator
 
 from src.deps.llm.client import LlmCaller
-from src.ingest.context import IngestContext
-from src.ingest.events import ClassifyingSpine, IngestEvent
-from src.ingest.llm_tasks.spine_classification_task import (
+from src.workflows.ingest.context import IngestContext
+from src.workflows.ingest.events import ClassifyingSpine, IngestEvent
+from src.workflows.ingest.llm_tasks.spine_classification_task import (
     SpineClassificationInput,
     SpineClassificationTask,
 )

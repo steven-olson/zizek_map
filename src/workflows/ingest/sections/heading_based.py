@@ -1,6 +1,6 @@
 from src.deps.epub_ingest import SpineItem
 from src.deps.postgres.tables import Chapter, Section
-from src.ingest.llm_tasks.sections_fallback_task import build_sections_from_offsets
+from src.workflows.ingest.llm_tasks.sections_fallback_task import build_sections_from_offsets
 
 
 class HeadingBasedStrategy:

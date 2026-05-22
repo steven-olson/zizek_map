@@ -4,9 +4,9 @@ from pathlib import Path
 
 from opentelemetry import trace
 
-from src.ingest.context import IngestContext
-from src.ingest.events import Done, Failed, IngestEvent
-from src.ingest.steps import Step
+from src.workflows.ingest.context import IngestContext
+from src.workflows.ingest.events import Done, Failed, IngestEvent
+from src.workflows.ingest.steps import Step
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)

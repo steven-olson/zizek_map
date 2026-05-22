@@ -2,8 +2,8 @@ import logging
 from collections.abc import AsyncIterator
 
 from src.deps.postgres.repositories import BookComponentRepository
-from src.ingest.context import IngestContext
-from src.ingest.events import IngestEvent, ReingestingExisting, SkippedAlreadyIngested
+from src.workflows.ingest.context import IngestContext
+from src.workflows.ingest.events import IngestEvent, ReingestingExisting, SkippedAlreadyIngested
 
 logger = logging.getLogger(__name__)
 
