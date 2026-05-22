@@ -8,13 +8,18 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
 logger = logging.getLogger(__name__)
 
 
-class Base(DeclarativeBase):
-    pass
+class Base(MappedAsDataclass, DeclarativeBase, kw_only=True):
+    """Project-wide ORM base — every mapped class is also a kw-only dataclass.
+
+    Intent: one class per concept (Book, Part, ...) doubles as both the construction
+    shape (kw-only constructor, dataclass equality) and the SQLAlchemy mapped entity.
+    No parallel Pydantic-vs-ORM hierarchy, no `from_pydantic` shim.
+    """
 
 
 class Database:
@@ -33,7 +38,7 @@ class Database:
     async def session(self) -> AsyncIterator[AsyncSession]:
         """Yield an `AsyncSession` and guarantee it gets closed when the block exits.
 
-        Intent: callers `async with table_rows.session() as s:` and never have to remember to
+        Intent: callers `async with db.session() as s:` and never have to remember to
         close — commits/rollbacks remain the caller's responsibility.
         """
         session = self._sessionmaker()

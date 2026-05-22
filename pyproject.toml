@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-ai>=1.101.0",
     "pydantic-settings>=2.14.1",
+    "pyright>=1.1.409",
     "python-dotenv>=1.2.2",
     "sqlalchemy[asyncio]>=2.0.49",
     "textual>=8.2.7",
@@ -33,3 +34,7 @@ target-version = ["py312"]
 [tool.isort]
 profile = "black"
 line_length = 100
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"

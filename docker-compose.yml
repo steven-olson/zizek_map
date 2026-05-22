@@ -43,7 +43,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://zizek:zizek@postgres:5432/zizek
-      BOOKS_DIR: /app/books
+      APP_BOOKS_DIR: /app/books
     env_file:
       - path: .env
         required: false
@@ -52,6 +52,23 @@ services:
       - ./local_scripts:/app/local_scripts:ro
     tty: true
     stdin_open: true
+
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dozzle:
+    image: amir20/dozzle:latest
+    ports:
+      - "8081:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
 volumes:
   pgdata:

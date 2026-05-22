@@ -1,4 +1,4 @@
-"""initial schema: books, parts, chapters, sections"""
+"""initial schema: books, parts, chapters, sections, llm_cache_entries"""
 
 from collections.abc import Sequence
 
@@ -12,10 +12,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """Create the four core tables: books, parts, chapters, sections.
+    """Create the five tables: books, parts, chapters, sections, llm_cache_entries.
 
-    Intent: establish the persistent structure mirroring the Pydantic domain models,
-    with `ON DELETE CASCADE` everywhere so removing a Book cleans up the whole tree.
+    Intent: persistent structure for the ingest pipeline, with `ON DELETE CASCADE`
+    everywhere so removing a Book cleans up the whole tree, plus a content-keyed
+    LLM response cache so re-runs of the same prompt+input never pay twice.
     """
     op.create_table(
         "books",
@@ -23,6 +24,7 @@ def upgrade() -> None:
         sa.Column("title", sa.String(), nullable=False),
         sa.Column("author", sa.String(), nullable=True),
         sa.Column("file_path", sa.String(), nullable=False, unique=True),
+        sa.Column("file_hash", sa.String(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -104,12 +106,25 @@ def upgrade() -> None:
     )
     op.create_index("ix_sections_parent_chapter_id", "sections", ["parent_chapter_id"])
 
+    op.create_table(
+        "llm_cache_entries",
+        sa.Column("cache_key", sa.String(), primary_key=True),
+        sa.Column("response_json", sa.Text(), nullable=False),
+        sa.Column("model", sa.String(), nullable=False),
+        sa.Column("input_tokens", sa.Integer(), nullable=True),
+        sa.Column("output_tokens", sa.Integer(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+    )
+
 
 def downgrade() -> None:
-    """Drop the four tables in reverse dependency order.
-
-    Intent: reverse of `upgrade` so `alembic downgrade base` returns to a clean schema.
-    """
+    """Drop the five tables in reverse dependency order."""
+    op.drop_table("llm_cache_entries")
     op.drop_table("sections")
     op.drop_table("chapters")
     op.drop_table("parts")

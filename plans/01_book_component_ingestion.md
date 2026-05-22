@@ -59,7 +59,7 @@ The breakdown service detects whether the book has parts based on the LLM's spin
 - `.gitignore` (`.env`, `__pycache__`, `.venv`, build artifacts).
 - **Keep top-level `main.py`** as the kickoff entry point. It becomes a thin wrapper:
   ```python
-  from src.textual.app import run
+  from src.entrypoints.textual.app import run
 
   if __name__ == "__main__":
       run()
@@ -260,8 +260,9 @@ Rename `src/entrypoints/` → `src/textual/`.
 ### Top-level `main.py`
 
 Thin kickoff wrapper:
+
 ```python
-from src.textual.app import run
+from src.entrypoints.textual.app import run
 
 if __name__ == "__main__":
     run()

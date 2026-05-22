@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import ebooklib
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup
 from bs4.builder import ParserRejectedMarkup
+from bs4.element import NavigableString, Tag
 from ebooklib import epub
 
 logger = logging.getLogger(__name__)

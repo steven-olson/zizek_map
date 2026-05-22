@@ -2,17 +2,15 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
-
-from src.deps.postgres.table_rows import BookRow
-from src.textual.screens.ingest import IngestScreen
 from textual import on
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Header
 
+from src.entrypoints.textual.screens.ingest import IngestScreen
+
 if TYPE_CHECKING:
-    from src.textual.app import ZizekMapApp
+    from src.entrypoints.textual.app import ZizekMapApp
 
 logger = logging.getLogger(__name__)
 
@@ -21,28 +19,19 @@ class FilePickerScreen(Screen):
     BINDINGS = [("enter", "ingest", "Ingest selected")]
 
     def compose(self) -> ComposeResult:
-        """Lay out the screen: header + a single-column DataTable of epubs + footer.
-
-        Intent: keep this screen visually trivial — one table, row-cursor selection,
-        Enter to ingest. The actual data population happens in `on_mount`.
-        """
+        """Lay out a header + DataTable of epubs + footer."""
         yield Header(show_clock=False)
         yield DataTable(id="files", cursor_type="row")
         yield Footer()
 
     async def on_mount(self) -> None:
-        """Populate the table by listing the books dir and cross-checking against Postgres.
-
-        Intent: give the user instant signal about which files are already in the DB
-        so they don't accidentally re-ingest. Failures in the DB lookup fall back to
-        an empty 'ingested' set rather than blocking the picker.
-        """
+        """Populate the table by listing the books dir and cross-checking the repo."""
         self.sub_title = "Pick an EPUB to ingest"
         table = self.query_one("#files", DataTable)
         table.add_columns("File", "Size (KB)", "Status")
 
         app: "ZizekMapApp" = self.app  # type: ignore[assignment]
-        books_dir = app.deps.settings.books_dir
+        books_dir = app.deps.settings.app.books_dir
         ingested = await self._load_ingested_paths()
 
         epubs = app.deps.epub_reader.list_available_epubs(books_dir)
@@ -58,27 +47,20 @@ class FilePickerScreen(Screen):
             table.add_row(epub_path.name, size_kb, status)
 
     async def _load_ingested_paths(self) -> set[str]:
-        """Return the set of `file_path` values already present in the books table.
+        """Return file_paths already in the books table, or an empty set on DB error.
 
-        Intent: cheap lookup used purely for the status badge — degrades gracefully
-        if Postgres is unreachable so the picker still works for fresh dev setups.
+        Degrades gracefully so the picker still works on a fresh dev setup before
+        the first migration has been run.
         """
         app: "ZizekMapApp" = self.app  # type: ignore[assignment]
         try:
-            async with app.deps.db.session() as session:
-                result = await session.execute(select(BookRow.file_path))
-                return set(result.scalars().all())
+            return await app.deps.book_repo.list_ingested_paths()
         except Exception as exc:
             logger.warning("could not load ingested books: %s", exc)
             return set()
 
     @on(DataTable.RowSelected)
     def _row_selected(self, event: DataTable.RowSelected) -> None:
-        """Push the ingest screen when the user clicks/Enters a file row.
-
-        Intent: same path as the keyboard `action_ingest` — both inputs converge on
-        creating a fresh IngestScreen so the workflow runs once per user action.
-        """
         if not self._epub_paths:
             return
         path = self._epub_paths[event.cursor_row]
@@ -86,11 +68,6 @@ class FilePickerScreen(Screen):
         self.app.push_screen(IngestScreen(epub_path=path))
 
     def action_ingest(self) -> None:
-        """Keyboard handler that triggers ingest on whichever file the cursor is on.
-
-        Intent: complement the click-to-select flow with a pure-keyboard path so
-        users can drive the UI without leaving the home row.
-        """
         table = self.query_one("#files", DataTable)
         if not self._epub_paths:
             return
