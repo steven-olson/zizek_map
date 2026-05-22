@@ -1,17 +1,13 @@
 from src.deps.epub_ingest import ParsedEpub, TocNode
-from src.deps.llm_client import LlmClient
 from src.models.llm_responses import SpineClassificationResponse
 
 _SPINE_PREVIEW_CHARS = 300
 
 
 class SpineClassificationPrompt:
-    """Bundle for the 'classify EPUB spine items into structural roles' LLM call.
-
-    Pairs the system prompt, the expected response model, and the per-call user-prompt
-    builder so the service only has to call `execute(...)` — never to assemble strings
-    or know the response schema.
-    """
+    """Declarative spec for the 'classify EPUB spine items into structural roles' LLM
+    call: pairs the system prompt, the expected response model, and a pure user-prompt
+    builder. Knows nothing about how the call is executed."""
 
     SYSTEM = """\
 You classify the spine items of an EPUB book into their structural role.
@@ -51,21 +47,8 @@ is substantial body content (the plaintext_chars count and preview will indicate
 
     RESPONSE_MODEL = SpineClassificationResponse
 
-    @classmethod
-    async def execute(cls, llm: LlmClient, parsed: ParsedEpub) -> SpineClassificationResponse:
-        """Run the classification call end-to-end against the given LLM.
-
-        Intent: the service calls this once per ingest and receives a typed response
-        ready for downstream synthesis; no prompt strings escape this class.
-        """
-        return await llm.call_structured(
-            system=cls.SYSTEM,
-            user=cls._build_user(parsed),
-            response_model=cls.RESPONSE_MODEL,
-        )
-
     @staticmethod
-    def _build_user(parsed: ParsedEpub) -> str:
+    def build_user(parsed: ParsedEpub) -> str:
         """Assemble the user-message context Claude needs to classify every spine item.
 
         Intent: bundle the TOC tree and a compact per-spine snapshot (file path,

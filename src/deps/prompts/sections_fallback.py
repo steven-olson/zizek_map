@@ -1,15 +1,14 @@
 from src.deps.epub_ingest import SpineItem
-from src.deps.llm_client import LlmClient
 from src.models.llm_responses import SectionsResponse
 from src.models.text_components import Chapter
 
 
 class SectionsFallbackPrompt:
-    """Bundle for the 'find sections inside an unmarked chapter' LLM call.
+    """Declarative spec for the 'find sections inside an unmarked chapter' LLM call.
 
     Used only when a chapter has no `<h3>` headings AND its plaintext is long enough
-    to plausibly have sub-structure — pairs the system prompt, response model, and
-    user-prompt builder so the service is one `execute(...)` call away from results.
+    to plausibly have sub-structure. Pairs the system prompt, the expected response
+    model, and a pure user-prompt builder; knows nothing about how the call is run.
     """
 
     SYSTEM = """\
@@ -28,23 +27,8 @@ the chapter as a single section.
 
     RESPONSE_MODEL = SectionsResponse
 
-    @classmethod
-    async def execute(
-        cls, llm: LlmClient, spine_item: SpineItem, chapter: Chapter
-    ) -> SectionsResponse:
-        """Run the section-fallback call end-to-end against the given LLM.
-
-        Intent: keep all prompt-rendering concerns inside this class; the service only
-        needs to pass in the spine item + chapter and consume the typed response.
-        """
-        return await llm.call_structured(
-            system=cls.SYSTEM,
-            user=cls._build_user(spine_item, chapter),
-            response_model=cls.RESPONSE_MODEL,
-        )
-
     @staticmethod
-    def _build_user(spine_item: SpineItem, chapter: Chapter) -> str:
+    def build_user(spine_item: SpineItem, chapter: Chapter) -> str:
         """Assemble the user message: chapter title + full chapter plaintext + instructions.
 
         Intent: give the model the entire chapter so it can find topic shifts, and
