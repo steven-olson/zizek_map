@@ -3,12 +3,12 @@ import logging
 from src.deps.epub_ingest import SpineItem
 from src.deps.llm.client import LlmCaller
 from src.deps.postgres.tables import Chapter, Section
-from src.ingest.sections.single_section import SingleSectionStrategy
 from src.ingest.llm_tasks.sections_fallback_task import (
     SectionsFallbackInput,
     SectionsFallbackTask,
     build_sections_from_offsets,
 )
+from src.ingest.sections.single_section import SingleSectionStrategy
 
 logger = logging.getLogger(__name__)
 

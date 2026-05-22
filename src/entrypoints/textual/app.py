@@ -2,9 +2,9 @@ import logging
 
 from textual.app import App
 
-from src.ingest.composition import AppDeps, build_deps
 from src.entrypoints.textual.screens.file_picker import FilePickerScreen
 from src.entrypoints.textual.screens.ingested_books import IngestedBooksScreen
+from src.ingest.composition import AppDeps, build_deps
 
 logger = logging.getLogger(__name__)
 

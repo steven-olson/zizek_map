@@ -27,6 +27,22 @@ run:
 ingest:
 	docker compose run --rm app uv run python -m src.entrypoints.cli ingest /app/books/$(path)
 
+# One-shot bootstrap: build the image, start Postgres, apply migrations, and
+# launch the Textual UI. Equivalent to running `make build up migrate run`
+# in sequence. Use this on first checkout or after a `make nuke`.
+start:
+	$(MAKE) build
+	$(MAKE) up
+	$(MAKE) migrate
+	$(MAKE) run
+
+# Wipe everything this project has created in Docker: containers, the default
+# network, the pgdata volume (so Postgres starts empty), and all images
+# (including the locally built app image and the pulled postgres image).
+# After this, `make start` rebuilds from scratch.
+nuke:
+	docker compose down -v --rmi all --remove-orphans
+
 fmt:
 	uv run black .
 	uv run isort .

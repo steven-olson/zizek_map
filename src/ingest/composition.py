@@ -1,4 +1,3 @@
-import logging
 from dataclasses import dataclass
 
 from src.deps.concurrency import BoundedConcurrentRunner
@@ -14,9 +13,10 @@ from src.ingest.steps.classify_spine import ClassifySpineStep
 from src.ingest.steps.parse_epub import ParseEpubStep
 from src.ingest.steps.persist import PersistStep
 from src.ingest.steps.resolve_sections import ResolveSectionsStep
+from src.observability import configure_observability
 from src.settings import Settings, get_settings
 
-logger = logging.getLogger(__name__)
+_SERVICE_NAME = "zizek-map-mvp"
 
 _SECTION_FALLBACK_THRESHOLD = 4000
 
@@ -44,10 +44,7 @@ def build_deps() -> AppDeps:
     together — add a new dependency once here and every entrypoint inherits it.
     """
     settings = get_settings()
-    logging.basicConfig(
-        level=settings.app.log_level,
-        format="%(asctime)s %(levelname)-7s %(name)s :: %(message)s",
-    )
+    configure_observability(service_name=_SERVICE_NAME, log_level=settings.app.log_level)
     epub_reader = EpubIngestReader()
     db = Database(database_url=settings.database.url, echo=settings.database.echo)
     book_repo = BookComponentRepository(db=db)

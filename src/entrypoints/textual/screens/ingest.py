@@ -6,7 +6,6 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Footer, Header, RichLog
 
-from src.ingest.composition import build_ingest_pipeline
 from src.ingest import (
     ChapterCompleted,
     ChapterStarted,
@@ -20,6 +19,7 @@ from src.ingest import (
     ReingestingExisting,
     SkippedAlreadyIngested,
 )
+from src.ingest.composition import build_ingest_pipeline
 
 if TYPE_CHECKING:
     from src.entrypoints.textual.app import ZizekMapApp

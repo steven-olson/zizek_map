@@ -37,8 +37,11 @@ class BookComponentRepository:
     ) -> None:
         """Persist a full ingest in one transaction (book + parts + chapters + sections).
 
-        Intent: all-or-nothing — if any insert fails, the whole tree rolls back so
-        Postgres never holds a partially-ingested book.
+        Intent: all-or-nothing — every insert lives in one transaction so a failure
+        mid-tree rolls back cleanly. We flush tier-by-tier (book → parts → chapters
+        → sections) so each FK target exists in the DB before its dependents are
+        inserted; SQLAlchemy's auto-ordering doesn't reliably handle this when the
+        relationships are declared via ForeignKey columns only (no `relationship()`).
         """
         logger.info(
             "saving breakdown book_id=%s parts=%d chapters=%d sections=%d",
@@ -49,9 +52,15 @@ class BookComponentRepository:
         )
         async with self._db.session() as session:
             session.add(book)
-            session.add_all(parts)
-            session.add_all(chapters)
-            session.add_all(sections)
+            await session.flush()
+            if parts:
+                session.add_all(parts)
+                await session.flush()
+            if chapters:
+                session.add_all(chapters)
+                await session.flush()
+            if sections:
+                session.add_all(sections)
             await session.commit()
 
     async def find_by_file_path(self, file_path: str) -> Book | None:

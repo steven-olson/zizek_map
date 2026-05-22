@@ -3,7 +3,6 @@ import asyncio
 import sys
 from pathlib import Path
 
-from src.ingest.composition import build_deps, build_ingest_pipeline
 from src.ingest import (
     ChapterCompleted,
     ChapterStarted,
@@ -17,6 +16,7 @@ from src.ingest import (
     ReingestingExisting,
     SkippedAlreadyIngested,
 )
+from src.ingest.composition import build_deps, build_ingest_pipeline
 
 
 def _format(event: IngestEvent) -> str:
