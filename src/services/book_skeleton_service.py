@@ -51,6 +51,7 @@ class BookSkeletonService:
         chapters = self._build_chapters(
             parsed, classifications_by_path, book.id, part_id_by_file_path
         )
+        self._validate_chapter_part_links(parts, chapters)
 
         logger.info(
             "skeleton built: book=%s parts=%d chapters=%d",
@@ -59,6 +60,28 @@ class BookSkeletonService:
             len(chapters),
         )
         return BookSkeleton(book=book, parts=parts, chapters=chapters)
+
+    @staticmethod
+    def _validate_chapter_part_links(parts: list[Part], chapters: list[Chapter]) -> None:
+        """Assert every chapter's `parent_part_id` resolves to an actual Part in this batch.
+
+        Intent: this is an invariant of `_build_chapters` (it only sets parent_part_id
+        via a lookup in `part_id_by_file_path`, whose values are the part ids we just
+        created), so this check is paranoia. But if it ever fails, the FK violation
+        surfaces at the service layer with a clear message — much easier to diagnose
+        than a generic Postgres FK error during commit.
+        """
+        valid_part_ids = {p.id for p in parts}
+        for chapter in chapters:
+            if chapter.parent_part_id is None:
+                continue
+            if chapter.parent_part_id not in valid_part_ids:
+                raise RuntimeError(
+                    f"chapter {chapter.title!r} (spine={chapter.spine_file_path!r}) has "
+                    f"parent_part_id={chapter.parent_part_id!r}, which is not in the set of "
+                    f"built Part ids {sorted(valid_part_ids)!r} — this should never happen, "
+                    "so _build_chapters has a bug or `parent_part_id` was mutated post-construction."
+                )
 
     async def _classify_spine(
         self, parsed: ParsedEpub, spine_items: list[SpineItem]
@@ -128,6 +151,11 @@ class BookSkeletonService:
             )
             parts.append(part)
             part_id_by_file_path[spine_item.file_path] = part.id
+        logger.info(
+            "built %d parts: %s",
+            len(parts),
+            [(p.title, p.id) for p in parts],
+        )
         return parts, part_id_by_file_path
 
     @staticmethod
@@ -147,11 +175,16 @@ class BookSkeletonService:
             cls = classifications_by_path.get(spine_item.file_path)
             if cls is None or cls.role != "chapter":
                 continue
-            parent_part_id = (
-                part_id_by_file_path.get(cls.parent_part_file_path)
-                if cls.parent_part_file_path
-                else None
-            )
+            parent_part_id: str | None = None
+            if cls.parent_part_file_path:
+                parent_part_id = part_id_by_file_path.get(cls.parent_part_file_path)
+                if parent_part_id is None:
+                    logger.warning(
+                        "chapter spine=%r references parent_part_file_path=%r which has no "
+                        "matching part_divider in this book; leaving parent_part_id=None",
+                        spine_item.file_path,
+                        cls.parent_part_file_path,
+                    )
             chapters.append(
                 Chapter(
                     title=(cls.clean_title or spine_item.file_path).strip(),
@@ -163,4 +196,12 @@ class BookSkeletonService:
                     parent_part_id=parent_part_id,
                 )
             )
+        logger.info(
+            "built %d chapters; parent_part_id distribution: %s",
+            len(chapters),
+            {
+                pid: sum(1 for c in chapters if c.parent_part_id == pid)
+                for pid in {c.parent_part_id for c in chapters}
+            },
+        )
         return chapters

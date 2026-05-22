@@ -77,10 +77,18 @@ class BookIngestWorkflow:
 
         Intent: keep the Pydantic → ORM mapping and the session-management ceremony
         in one place so the rest of the codebase never touches SQLAlchemy directly.
+        Each parent layer is flushed before the dependent rows are added so the FK
+        targets are visible to the database in the right order — relying on the
+        SQLAlchemy unit-of-work topological sort is fine in theory but explicit
+        flushes leave zero ambiguity if a dependent row later violates a constraint.
         """
         async with self._db.session() as session:
             session.add(BookRow.from_pydantic(result.book))
-            session.add_all(PartRow.from_pydantic(p) for p in result.parts)
+            await session.flush()
+            if result.parts:
+                session.add_all(PartRow.from_pydantic(p) for p in result.parts)
+                await session.flush()
             session.add_all(ChapterRow.from_pydantic(c) for c in result.chapters)
+            await session.flush()
             session.add_all(SectionRow.from_pydantic(s) for s in result.sections)
             await session.commit()

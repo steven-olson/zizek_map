@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from src.deps.epub_ingest import EpubIngestReader
 from src.deps.llm.llm_client import LlmClient
 from src.deps.postgres.database import Database
+from src.deps.telemetry import Telemetry
 from src.services.book_skeleton_service import BookSkeletonService
 from src.services.chapter_sectioning_service import ChapterSectioningService
 from src.settings import Settings, get_settings
@@ -63,10 +64,7 @@ def run() -> None:
     All construction of clients, sessions, and services happens here so the rest of
     the codebase never sees a constructor call to a dep.
     """
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)-7s %(name)s :: %(message)s",
-    )
+    Telemetry.setup()
     settings = get_settings()
     epub_reader = EpubIngestReader()
     llm_client = LlmClient(

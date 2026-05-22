@@ -15,6 +15,25 @@ services:
       timeout: 3s
       retries: 20
 
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    ports:
+      - "9999:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
   app:
     build:
       context: .
@@ -30,6 +49,7 @@ services:
         required: false
     volumes:
       - ./books:/app/books:ro
+      - ./local_scripts:/app/local_scripts:ro
     tty: true
     stdin_open: true
 
