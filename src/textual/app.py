@@ -2,12 +2,14 @@ import logging
 from dataclasses import dataclass
 
 from src.deps.epub_ingest import EpubIngestReader
-from src.deps.llm_client import LlmClient
+from src.deps.llm.llm_client import LlmClient
 from src.deps.postgres.database import Database
-from src.services.book_component_breakdown_service import BookComponentBreakdownService
+from src.services.book_skeleton_service import BookSkeletonService
+from src.services.chapter_sectioning_service import ChapterSectioningService
 from src.settings import Settings, get_settings
 from src.textual.screens.file_picker import FilePickerScreen
 from src.textual.screens.ingested_books import IngestedBooksScreen
+from src.workflows.book_ingest_workflow import BookIngestWorkflow
 from textual.app import App
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,7 @@ class AppDeps:
     epub_reader: EpubIngestReader
     llm_client: LlmClient
     db: Database
-    service: BookComponentBreakdownService
+    ingest_workflow: BookIngestWorkflow
 
 
 class ZizekMapApp(App):
@@ -72,13 +74,20 @@ def run() -> None:
         api_key=settings.llm_api_key,
     )
     db = Database(database_url=settings.database_url)
-    service = BookComponentBreakdownService(epub_reader=epub_reader, llm_client=llm_client)
+    skeleton_service = BookSkeletonService(llm_client=llm_client)
+    sectioning_service = ChapterSectioningService(llm_client=llm_client)
+    ingest_workflow = BookIngestWorkflow(
+        epub_reader=epub_reader,
+        skeleton_service=skeleton_service,
+        sectioning_service=sectioning_service,
+        db=db,
+    )
     deps = AppDeps(
         settings=settings,
         epub_reader=epub_reader,
         llm_client=llm_client,
         db=db,
-        service=service,
+        ingest_workflow=ingest_workflow,
     )
     app = ZizekMapApp(deps=deps)
     app.run()

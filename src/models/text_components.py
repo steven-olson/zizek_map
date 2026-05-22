@@ -52,6 +52,12 @@ class Section(BaseModel):
     parent_chapter_id: str = Field(description="ID of the parent Chapter")
 
 
+class BookSkeleton(BaseModel):
+    book: Book
+    parts: list[Part] = Field(default_factory=list, description="Empty when the book has no parts")
+    chapters: list[Chapter]
+
+
 class BookStructuredComponents(BaseModel):
     book: Book
     parts: list[Part] = Field(default_factory=list, description="Empty when the book has no parts")

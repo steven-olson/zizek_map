@@ -1,14 +1,13 @@
 from src.deps.epub_ingest import SpineItem
-from src.models.llm_responses import SectionsResponse
 from src.models.text_components import Chapter
 
 
 class SectionsFallbackPrompt:
-    """Declarative spec for the 'find sections inside an unmarked chapter' LLM call.
-
-    Used only when a chapter has no `<h3>` headings AND its plaintext is long enough
-    to plausibly have sub-structure. Pairs the system prompt, the expected response
-    model, and a pure user-prompt builder; knows nothing about how the call is run.
+    """System prompt + user-message builder for the 'find sections inside an unmarked
+    chapter' LLM call. Used when a chapter has no explicit structural markers (no TOC
+    fragments, no `<h3>` headings) but is long enough to plausibly have sub-structure.
+    Holds no response model — the service pairs this with the matching response model
+    when invoking the LLM client.
     """
 
     SYSTEM = """\
@@ -24,8 +23,6 @@ section by string-matching.
 If the chapter has no clear sub-structure, return an empty `sections` list and I will treat
 the chapter as a single section.
 """
-
-    RESPONSE_MODEL = SectionsResponse
 
     @staticmethod
     def build_user(spine_item: SpineItem, chapter: Chapter) -> str:

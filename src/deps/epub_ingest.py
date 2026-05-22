@@ -23,12 +23,14 @@ class SpineItem:
     file_path: str
     plaintext: str
     headings: list[HeadingMatch]
+    id_offsets: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
 class TocNode:
     label: str
     file_path: str | None
+    fragment: str | None = None
     children: list["TocNode"] = field(default_factory=list)
 
 
@@ -41,9 +43,17 @@ class ParsedEpub:
 
 
 class EpubIngestReader:
-    """Pure parsing utility. Reads an EPUB file from disk and produces a ParsedEpub
-    with spine items (plaintext + heading offsets) and the TOC tree. Knows nothing
-    about what counts as a chapter — that's the breakdown service's job."""
+    """Owner of steps 1 + 2 of book ingestion.
+
+    Step 1: locate the source — `list_available_epubs(books_dir)` enumerates `.epub`
+    files for the UI; the user picks one.
+    Step 2: parse — `read(path)` produces a `ParsedEpub` with the book's metadata,
+    its ordered spine of `SpineItem`s (plaintext, heading offsets, element-id offsets),
+    and the `toc.ncx` tree as `TocNode`s with `(file_path, fragment)` preserved.
+
+    This module makes NO decisions about what counts as a chapter, a part, or a
+    section — those judgments belong to BookSkeletonService and ChapterSectioningService.
+    """
 
     def read(self, epub_path: Path) -> ParsedEpub:
         """Parse a single EPUB file into a ParsedEpub.
@@ -105,13 +115,14 @@ class EpubIngestReader:
             if item is None or item.get_type() != ebooklib.ITEM_DOCUMENT:
                 continue
             raw = item.get_content()
-            plaintext, headings = self._extract_plaintext_and_headings(raw)
+            plaintext, headings, id_offsets = self._extract_plaintext_and_headings(raw)
             items.append(
                 SpineItem(
                     idref=idref,
                     file_path=item.get_name(),
                     plaintext=plaintext,
                     headings=headings,
+                    id_offsets=id_offsets,
                 )
             )
         return items
@@ -126,32 +137,40 @@ class EpubIngestReader:
             head, children = entry
             label = getattr(head, "title", str(head))
             href = getattr(head, "href", None)
+            file_path, fragment = self._split_href(href)
             return TocNode(
                 label=label,
-                file_path=self._strip_fragment(href),
+                file_path=file_path,
+                fragment=fragment,
                 children=[self._build_toc_node(c) for c in children],
             )
         label = getattr(entry, "title", str(entry))
         href = getattr(entry, "href", None)
-        return TocNode(label=label, file_path=self._strip_fragment(href), children=[])
+        file_path, fragment = self._split_href(href)
+        return TocNode(label=label, file_path=file_path, fragment=fragment, children=[])
 
     @staticmethod
-    def _strip_fragment(href: str | None) -> str | None:
-        """Drop the `#fragment` suffix from a TOC href so it matches a spine file_path.
+    def _split_href(href: str | None) -> tuple[str | None, str | None]:
+        """Split a TOC href into `(file_path, fragment)`, either of which may be None.
 
-        Intent: TOC entries may point to an in-document anchor (e.g. `08_Chapter1.xhtml#sec1`),
-        but the breakdown service joins on the bare file path; this normalizes that key.
+        Intent: TOC entries may point to an in-document anchor (e.g. `08_Chapter1.xhtml#sec1`).
+        The breakdown service needs both halves: the bare file_path to match against a
+        spine item, and the fragment to look up an element-id char offset for sections.
         """
         if href is None:
-            return None
-        return href.split("#", 1)[0]
+            return None, None
+        file_path, _, fragment = href.partition("#")
+        return (file_path or None), (fragment or None)
 
-    def _extract_plaintext_and_headings(self, xhtml_bytes: bytes) -> tuple[str, list[HeadingMatch]]:
-        """Render an XHTML document to plaintext while recording h1/h2/h3 char offsets.
+    def _extract_plaintext_and_headings(
+        self, xhtml_bytes: bytes
+    ) -> tuple[str, list[HeadingMatch], dict[str, int]]:
+        """Render an XHTML document to plaintext, recording heading offsets and id offsets.
 
         Intent: produce the single source of truth that addresses Section ranges by
-        `(spine_file_path, char_start, char_end)` — the plaintext is what gets sliced,
-        and the heading offsets are what define section boundaries.
+        `(spine_file_path, char_start, char_end)`. Heading offsets define h2/h3-driven
+        section boundaries; element-id offsets let TOC fragments (`#filepos92795`) be
+        resolved deterministically to a starting char position.
         """
         try:
             soup = BeautifulSoup(xhtml_bytes, "lxml-xml")
@@ -160,7 +179,7 @@ class EpubIngestReader:
         body = soup.find("body") or soup
         extractor = _PlaintextExtractor()
         extractor.walk(body)
-        return extractor.text(), extractor.headings
+        return extractor.text(), extractor.headings, extractor.id_offsets
 
 
 class _PlaintextExtractor:
@@ -187,6 +206,7 @@ class _PlaintextExtractor:
         self._len: int = 0
         self._trailing_newlines: int = 2
         self.headings: list[HeadingMatch] = []
+        self.id_offsets: dict[str, int] = {}
 
     def walk(self, node: Tag) -> None:
         """Public entry point — walk the given root and accumulate plaintext + headings.
@@ -223,6 +243,9 @@ class _PlaintextExtractor:
             return
         if name in self._BLOCK_TAGS:
             self._ensure_paragraph_break()
+        element_id = node.get("id")
+        if element_id:
+            self.id_offsets.setdefault(element_id, self._len)
         if name in self._HEADING_TAGS:
             heading_text = " ".join(node.get_text("", strip=False).split())
             self.headings.append(
