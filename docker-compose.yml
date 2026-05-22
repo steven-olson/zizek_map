@@ -24,7 +24,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://zizek:zizek@postgres:5432/zizek
-      BOOKS_DIR: /app/books
+      APP_BOOKS_DIR: /app/books
     env_file:
       - path: .env
         required: false
