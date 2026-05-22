@@ -3,10 +3,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from src.deps.postgres.table_rows import BookRow
+from src.deps.postgres.table_rows import BookRow, PartRow, SectionRow
 from src.deps.postgres.table_rows.chapter_row import ChapterRow
-from src.deps.postgres.table_rows import PartRow
-from src.deps.postgres.table_rows import SectionRow
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal

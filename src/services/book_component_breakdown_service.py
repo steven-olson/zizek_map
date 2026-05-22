@@ -1,19 +1,14 @@
 import logging
 from pathlib import Path
 
-from src.deps.claude_client import ClaudeClient
-from src.deps.epub_ingest import EpubIngestReader, HeadingMatch, ParsedEpub, SpineItem, TocNode
-from src.models.llm_responses import (
-    SectionsResponse,
-    SpineClassificationResponse,
-    SpineItemClassification,
-    SpineRole,
-)
+from src.deps.epub_ingest import EpubIngestReader, HeadingMatch, ParsedEpub, SpineItem
+from src.deps.llm_client import LlmClient
+from src.deps.prompts.sections_fallback import SectionsFallbackPrompt
+from src.deps.prompts.spine_classification import SpineClassificationPrompt
 from src.models.text_components import Book, BookStructuredComponents, Chapter, Part, Section
 
 logger = logging.getLogger(__name__)
 
-_SPINE_PREVIEW_CHARS = 300
 _SECTION_FALLBACK_THRESHOLD = 4000
 
 
@@ -25,14 +20,14 @@ class BookComponentBreakdownService:
     """Business logic: given a book on disk, return its structured components
     (book + parts + chapters + sections). Does not persist."""
 
-    def __init__(self, epub_reader: EpubIngestReader, claude_client: ClaudeClient) -> None:
+    def __init__(self, epub_reader: EpubIngestReader, llm_client: LlmClient) -> None:
         """Hold the two deps this service composes: epub parsing and the LLM client.
 
         Intent: dependency injection so the workflow controls lifecycle and tests can
         swap either side with fakes without monkey-patching.
         """
         self._epub_reader = epub_reader
-        self._claude_client = claude_client
+        self._llm_client = llm_client
 
     async def get_book_components(self, book_epub_path: Path) -> BookStructuredComponents:
         """One-shot end-to-end: parse the epub and return its full BookStructuredComponents.
@@ -53,18 +48,14 @@ class BookComponentBreakdownService:
     ) -> tuple[Book, list[Part], list[Chapter]]:
         """Decide which spine items are real chapters/parts and build domain objects for them.
 
-        Intent: a single LLM round-trip that consumes the EPUB's TOC + per-spine previews
-        and emits a classification per spine item. The deterministic spine ordering is
-        preserved when we synthesize Parts and Chapters from the LLM's verdicts.
+        Intent: a single LLM round-trip (delegated to SpineClassificationPrompt) that
+        consumes the EPUB's TOC + per-spine previews and emits a classification per
+        spine item. The deterministic spine ordering is preserved when we synthesize
+        Parts and Chapters from the LLM's verdicts.
         """
         logger.info("classifying spine items=%d for book=%r", len(parsed.spine), parsed.title)
 
-        user_prompt = self._build_classification_prompt(parsed)
-        response = await self._claude_client.call_structured(
-            system=_CLASSIFICATION_SYSTEM_PROMPT,
-            user=user_prompt,
-            response_model=SpineClassificationResponse,
-        )
+        response = await SpineClassificationPrompt.execute(self._llm_client, parsed)
         classifications_by_path = {item.file_path: item for item in response.items}
 
         book = Book(title=parsed.title, author=parsed.author, file_path=file_path)
@@ -206,25 +197,14 @@ class BookComponentBreakdownService:
         return sections
 
     async def _sections_from_llm(self, spine_item: SpineItem, chapter: Chapter) -> list[Section]:
-        """Ask Claude to find section breaks in a chapter that has no h3 headings.
+        """Ask the LLM to find section breaks in a chapter that has no h3 headings.
 
-        Intent: a fallback for the messy case — Claude returns titles + short verbatim
-        excerpts, and we string-match each excerpt against the chapter plaintext to
-        recover a deterministic char_start. Any excerpt that doesn't match is dropped.
+        Intent: a fallback for the messy case — the prompt class returns titles +
+        short verbatim excerpts, and we string-match each excerpt against the chapter
+        plaintext to recover a deterministic char_start. Any excerpt that doesn't
+        match is dropped.
         """
-        user_prompt = (
-            f"Chapter title: {chapter.title}\n\n"
-            "Identify the sections in the chapter text below. For each section, "
-            "return its title and a short verbatim excerpt (15-40 chars) from its first sentence "
-            "so I can locate it in the source.\n\n"
-            "CHAPTER TEXT:\n"
-            f"{spine_item.plaintext}"
-        )
-        response = await self._claude_client.call_structured(
-            system=_SECTION_FALLBACK_SYSTEM_PROMPT,
-            user=user_prompt,
-            response_model=SectionsResponse,
-        )
+        response = await SectionsFallbackPrompt.execute(self._llm_client, spine_item, chapter)
 
         offsets: list[tuple[str, int]] = []
         for sb in response.sections:
@@ -266,96 +246,3 @@ class BookComponentBreakdownService:
                 )
             )
         return sections
-
-    @staticmethod
-    def _build_classification_prompt(parsed: ParsedEpub) -> str:
-        """Render the per-book context Claude needs to classify spine items.
-
-        Intent: bundle the TOC tree and a compact per-spine snapshot (file path,
-        plaintext length, headings, short preview) into one user message — enough
-        signal to distinguish front matter / part divider / chapter / back matter
-        without sending the whole book text.
-        """
-        lines: list[str] = []
-        lines.append(f"BOOK TITLE: {parsed.title}")
-        if parsed.author:
-            lines.append(f"AUTHOR: {parsed.author}")
-        lines.append("")
-        lines.append("TABLE OF CONTENTS (from the EPUB's toc.ncx):")
-        for node in parsed.toc:
-            BookComponentBreakdownService._format_toc_node(node, depth=0, out=lines)
-        lines.append("")
-        lines.append("SPINE ITEMS (in reading order):")
-        for spine_item in parsed.spine:
-            preview = spine_item.plaintext[:_SPINE_PREVIEW_CHARS].replace("\n", " ").strip()
-            headings_summary = ", ".join(f"h{h.level}: {h.text!r}" for h in spine_item.headings[:5])
-            lines.append(
-                f"  - file_path: {spine_item.file_path}\n"
-                f"    plaintext_chars: {len(spine_item.plaintext)}\n"
-                f"    headings: [{headings_summary}]\n"
-                f"    preview: {preview!r}"
-            )
-        return "\n".join(lines)
-
-    @staticmethod
-    def _format_toc_node(node: TocNode, depth: int, out: list[str]) -> None:
-        """Append an indented textual representation of one TOC node + its descendants.
-
-        Intent: keep the prompt's TOC section human-readable so Claude can see the
-        Part → Chapter nesting at a glance and use it to populate `parent_part_file_path`.
-        """
-        indent = "  " * depth
-        out.append(f"{indent}- {node.label!r} -> {node.file_path}")
-        for child in node.children:
-            BookComponentBreakdownService._format_toc_node(child, depth + 1, out)
-
-
-_CLASSIFICATION_SYSTEM_PROMPT = """\
-You classify the spine items of an EPUB book into their structural role.
-
-You will receive:
-1. The book's title and author.
-2. The Table of Contents from the EPUB's toc.ncx (nested where the book has parts).
-3. The full ordered list of spine items, each with: file_path, plaintext character count, the
-   first few headings inside the file, and a short text preview.
-
-Return one entry per spine item, IN THE SAME ORDER. For each, assign exactly one role:
-
-  - "front_matter": cover page, half-title, full title page, copyright page, dedication,
-    epigraph, table-of-contents page, preface (if very short / formulaic), acknowledgments
-    that appear at the front.
-  - "part_divider": a Part-level grouping (e.g. "Part I: Beyond the Transcendental") that
-    has its own dedicated spine file. Typically very short — just a part label/title.
-    These appear as parents over chapters in the TOC.
-  - "chapter": a substantive unit of the book's content. Numbered chapters, interludes,
-    introductions/forewords with real content, conclusions, and afterwords all count as
-    chapters. Anything that contains the author's actual argument/material.
-  - "back_matter": index, appendices, bibliography, notes (if separated out), about-the-author,
-    other-titles, ads.
-
-For role="chapter" and role="part_divider", populate `clean_title` with a display-ready title.
-Strip publisher prefixes like "Chapter 1:" when the rest is a real title (e.g.
-"Chapter 1: Towards a Materialist Theory of Subjectivity" -> "Towards a Materialist Theory of
-Subjectivity"). For interludes, keep them named clearly (e.g. "Interlude I: Staging Feminine
-Hysteria"). For null roles, leave `clean_title` null.
-
-For role="chapter": if the TOC shows the chapter is nested under a part_divider, set
-`parent_part_file_path` to that part_divider's file_path. If the book has no parts, leave it null.
-
-Be conservative — when in doubt between front_matter and chapter, pick chapter only if there
-is substantial body content (the plaintext_chars count and preview will indicate this).
-"""
-
-_SECTION_FALLBACK_SYSTEM_PROMPT = """\
-You are given the full plaintext of a single chapter from a book that does NOT have explicit
-sub-section headings. Identify the natural section breaks within the chapter (topic shifts,
-new arguments, narrative pivots) and return them in reading order.
-
-For each section: provide a clean, short title (4-8 words) and `first_sentence_excerpt` — a
-short (15-40 character) verbatim slice from the very first sentence of that section's body
-text. The excerpt MUST appear EXACTLY in the chapter text I provided so I can locate the
-section by string-matching.
-
-If the chapter has no clear sub-structure, return an empty `sections` list and I will treat
-the chapter as a single section.
-"""

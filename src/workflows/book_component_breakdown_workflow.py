@@ -5,10 +5,8 @@ from pathlib import Path
 
 from src.deps.epub_ingest import EpubIngestReader
 from src.deps.postgres.database import Database
-from src.deps.postgres.table_rows import BookRow
+from src.deps.postgres.table_rows import BookRow, PartRow, SectionRow
 from src.deps.postgres.table_rows.chapter_row import ChapterRow
-from src.deps.postgres.table_rows import PartRow
-from src.deps.postgres.table_rows import SectionRow
 from src.services.book_component_breakdown_service import BookComponentBreakdownService
 
 logger = logging.getLogger(__name__)

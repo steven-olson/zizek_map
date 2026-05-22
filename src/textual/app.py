@@ -1,8 +1,8 @@
 import logging
 from dataclasses import dataclass
 
-from src.deps.claude_client import ClaudeClient
 from src.deps.epub_ingest import EpubIngestReader
+from src.deps.llm_client import LlmClient
 from src.deps.postgres.database import Database
 from src.services.book_component_breakdown_service import BookComponentBreakdownService
 from src.settings import Settings, get_settings
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class AppDeps:
     settings: Settings
     epub_reader: EpubIngestReader
-    claude_client: ClaudeClient
+    llm_client: LlmClient
     db: Database
     service: BookComponentBreakdownService
 
@@ -67,16 +67,16 @@ def run() -> None:
     )
     settings = get_settings()
     epub_reader = EpubIngestReader()
-    claude_client = ClaudeClient(
-        api_key=settings.anthropic_api_key,
-        model=settings.anthropic_model,
+    llm_client = LlmClient(
+        model=settings.llm_model,
+        api_key=settings.llm_api_key,
     )
     db = Database(database_url=settings.database_url)
-    service = BookComponentBreakdownService(epub_reader=epub_reader, claude_client=claude_client)
+    service = BookComponentBreakdownService(epub_reader=epub_reader, llm_client=llm_client)
     deps = AppDeps(
         settings=settings,
         epub_reader=epub_reader,
-        claude_client=claude_client,
+        llm_client=llm_client,
         db=db,
         service=service,
     )
