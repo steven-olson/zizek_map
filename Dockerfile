@@ -18,7 +18,7 @@ RUN uv sync --frozen --no-install-project
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY src ./src
-COPY main.py ./
+COPY src/main.py ./
 
 RUN uv sync --frozen
 
